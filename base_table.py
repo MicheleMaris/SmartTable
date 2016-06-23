@@ -1,6 +1,8 @@
 
 __DESCRIPTION__ = """Base for Table object."""
 
+__VERSION__="3.0 : 2016 Feb 24"
+
 def DescriptionV2(Dict,names=None,unit_value='',verbose=False) :
    """Try to compile a description from the dictionary
     This is a private method
@@ -161,6 +163,8 @@ class base_table :
             self.get_from_hdu(arg[0])
             self.__status__='init:completed'
             return
+   def version(self) :
+      return __VERSION__
    def _setup_metadata(self) :
       from collections import OrderedDict
       for k in self.list_metadata() : 
@@ -363,6 +367,7 @@ class base_table :
          for k in self.keys() :
             if 'numpy' in str(type(a.__dict__[k])) :
                a.__dict__[k].shape=u
+      a.__class__=self.__class__
       return a
    def flag(self,*arg,**karg) :
       import numpy as np
@@ -384,8 +389,14 @@ class base_table :
          flag*=(self.__dict__[k]==karg[k])
       idx=np.where(flag)[0]
       return self.argslice(idx)
-   def fields2arrays(self) :
-      "forces all the fields to be arrays"
+   def fields2arrays(self,operator='array') :
+      """reduce fields in the table to numpy arrays
+         keyword operator = type of operator to be used
+                    if operator == 'array' (default) 
+                       for k in self.keys() : self[k]=np.array(self[k])
+                    if operator == 'concatenate' (default) 
+                       for k in self.keys() : self[k]=np.concatenate(self[k])
+      """
       import numpy as np
       if len(self) == 1 :
          u=np.array([1]).shape
@@ -393,8 +404,14 @@ class base_table :
             self.__dict__[k]=np.array([self.__dict__[k]])
             self.__dict__[k].shape=u
       else :
-         for k in self.keys() :
-            self.__dict__[k]=np.array(self.__dict__[k])
+         if operator == 'array' :
+            for k in self.keys() :
+               self.__dict__[k]=np.array(self.__dict__[k])
+         elif operator == 'concatenate' :
+            for k in self.keys() :
+               self.__dict__[k]=np.concatenate(self.__dict__[k])
+         else :
+            raise Exception('Error: unknowm operator "'+operator+'" in reduce2array, valid values: "array", "concatenate".')
    def dict(self) :
       "returns the table as a dictionary (no metadata included)"
       out={}
@@ -455,10 +472,16 @@ class base_table :
             name=k if len(k) <=8 else 'HIERARCH '+k
             T.header.update(name,self.__info__[k])
       return T
-   def get_from_hdu(self,hdu) :
+   def get_from_hdu(self,hdu,capitalizeColumns=False,useTNAME=True) :
       "gets data from an hdu formatted as a fits table"
       for it in range(1,hdu.header['TFIELDS']+1) :
-         n=hdu.header['TTYPE%d'%it]
+         if useTNAME :
+            try :
+               n=hdu.header['TNAME%d'%it]
+            except :
+               n=hdu.header['TTYPE%d'%it]
+         else :
+               n=hdu.header['TTYPE%d'%it]
          try :
             u=hdu.header['TUNIT%d'%it]
          except :
@@ -471,21 +494,13 @@ class base_table :
             if d == None : d = ''
          except :
             d=''
-         self.newcolumn(n.capitalize(),hdu.data.field(n),unit=u,shape=f,description=d)
-   def append(self,that) :
-      """append a base table to the current table
-      It is assumed both tables have the same fields
-      Metainformations for the in_base_table are lost
-      """
-      import numpy as np
-      # test that the input table that has the same keys of the current table
-      for k in self.keys() :
-         if (that.keys(asArray=True) == k).sum() == 0 :
-            raise NameError("Error: Input table misses keyword '%s' in input table."%k)
-            return
-      # it is all ok, do concatenation
-      for k in self.keys() :
-         self[k]=np.concatenate([self[k],that[k]])
+         if useTNAME :
+            try :
+               aaa=hdu.header['TNAME%d'%it]
+            except :
+               aaa=n
+         if capitalizeColumns : n=n.capitalize()
+         self.newcolumn(n,hdu.data.field(n),unit=u,shape=f,description=d)
    def has_key(self,key) :
       "true if a column named key exists"
       k=self.keys(asArray=True)
@@ -525,17 +540,51 @@ class base_table :
          h2=plt.xlabel(arg[0])
          h3=plt.ylabel(arg[1])
          return h1,h2,h3
+   def append(self,that) :
+      """append a base table to the current table
+      It is assumed both tables have the same fields
+      Metainformations for the in_base_table are lost
+      """
+      import numpy as np
+      # test that the input table that has the same keys of the current table
+      for k in self.keys() :
+         if (that.keys(asArray=True) == k).sum() == 0 :
+            raise NameError("Error: Input table misses keyword '%s' in input table."%k)
+            return
+      # it is all ok, do concatenation
+      for k in self.keys() :
+         self[k]=np.concatenate([self[k],that[k]])
    def new_empty(self) :
       """returns an empty itself"""
-      return base_table()
-   def subtable(self,*arg) :
+      out=base_table()
+      out.__class__=self.__class__
+      return out
+   def table2template(self,initialValue=[]) :
+      """creates a template from existing table.
+         A template is a table with same fields in the current table, but empty.
+         initialValue=value of the field (default [])
+      """
+      out=self.new_empty()
+      for k in self.keys() : out.newcolumn(k,initialValue)
+      return out
+   def subtable(self,*arg,**karg) :
       """returns a table with only the columns specified as arguments"""
       import copy
       if len(arg) == 0 : 
          raise NameError("No column names specified")
-      for k in arg :
-         if not self.has_key(k) : 
-            raise NameError("Column %s does not exists"%k)
+      #
+      inclusive = karg['exclude']==False if karg.has_key('exclude') else True
+      ll=[]
+      if inclusive :
+         for k in arg :
+            if not self.has_key(k) : 
+               raise NameError("Column %s does not exists"%k)
+            ll.append(k)
+      else :
+         for k in self.keys() :
+            if not k in arg :
+               ll.append(k)
+      #
       that = self.new_empty()
       for k in self.list_metadata():
          try :
@@ -543,7 +592,7 @@ class base_table :
          except :
             print "metadata '%s' does not exists, skipped"%k
       that.clean_column_description()
-      for k in arg :
+      for k in ll :
          that[k]=copy.deepcopy(self[k])
          if self.has_name_column_description(k) :
             _name,_description,_unit,_shape = self.unpack_column_description(k)
@@ -556,3 +605,4 @@ class base_table :
       that.set_metadata('fitsfilename','')
       that.set_metadata('picklefilename','')
       return that
+
