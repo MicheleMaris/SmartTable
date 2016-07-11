@@ -164,6 +164,7 @@ class base_table :
             self.__status__='init:completed'
             return
    def version(self) :
+      """ returns a string with a version of the library"""
       return __VERSION__
    def _setup_metadata(self) :
       from collections import OrderedDict
@@ -173,6 +174,7 @@ class base_table :
          else :
             self.__dict__[k]=None
    def list_metadata(self,asArray=True) :
+      """ returns a list with names of metadata"""
       import numpy as np
       l=['__csvname__','__fsep__','__keys__','__picklefilename__','__description__','__info__','__metadata_list__','__columns_description__','__fitsfilename__','__tablename__','__status__']
       try :
@@ -182,12 +184,14 @@ class base_table :
          pass
       return np.array(l) if asArray else l
    def set_metadata(self,name,value) :
+      """ SET metadata"""
       mname='__%s__'%name
       if (self.list_metadata()==mname).sum() > 0 :
          self.__dict__[mname]=value
       else :
          raise NameError('Metadata %s not found'%name)
    def get_metadata(self,name) :
+      """ GET metadata"""
       mname='__%s__'%name
       if (self.list_metadata==mname).sum() > 0 :
          return self.__dict__[mname]
@@ -201,6 +205,7 @@ class base_table :
      if List == None : self.__keys__=None
      self.__keys__=list(List)
    def keys(self,noMeta=True,justMeta=False,asArray=False,fromColumnsDescription=False,forceInternal=False) : 
+      """ returns list of keys"""
       import numpy as np
       l=self.list_metadata(asArray=False)
       if justMeta : 
@@ -228,12 +233,14 @@ class base_table :
          l1=l1[idx]
          return np.array(l1) if asArray else list(l1)
    def __len__(self) : 
+      """ returns number of rows in the table"""
       import numpy as np
       k=self.keys()
       if len(k)==0 : return 0
       if np.isscalar(self.__dict__[k[0]]) : return 1
       return len(self.__dict__[k[0]])
    def copy(self,justCols=False,justMeta=False) :
+      """ returns a physical copy of the object"""
       import copy
       if justMeta :
          a=base_table()
@@ -257,9 +264,11 @@ class base_table :
       self[name]=value
       self.register_column_description(name,description,unit=unit,shape=shape) 
    def pickle(self,picklefilename) :
+      """ saves a table as a pickle file"""
       import pickle 
       pickle.dump(self.__dict__,open(picklefilename,'w'))
    def load(self,picklefilename) :
+      """ loads a table from a pickle file"""
       import pickle 
       self.__dict__=pickle.load(open(picklefilename,'r'))
       self.__picklefilename__=picklefilename
@@ -354,6 +363,7 @@ class base_table :
       except :
          return ''
    def argslice(self,idx) :
+      """ creates a new table from the current table slicing it at the elements listed in idx"""
       import numpy as np
       import copy
       a=self.copy(justMeta=True)
@@ -370,12 +380,14 @@ class base_table :
       a.__class__=self.__class__
       return a
    def flag(self,*arg,**karg) :
+      """ returns a flag column"""
       import numpy as np
       flag=np.ones(len(self))
       for k in karg.keys() :
          flag*=(self.__dict__[k]==karg[k])
       return flag
    def argselect(self,*arg,**karg) :
+      """ returns list of selected elements (see .select)"""
       import numpy as np
       flag=np.ones(len(self))
       for k in karg.keys() :
@@ -383,6 +395,30 @@ class base_table :
       idx=np.where(flag)[0]
       return idx
    def select(self,*arg,**karg) :
+      """ returns a table made of selected elements 
+          selection is made by assignining values to keywords (names of columns)
+          example: 
+             let be a table ANAGRAPHIC has columns NAME. SURNAME, CODE
+             it is possible to create subtables as following
+          
+             # all the elements whose name is Jhon
+             NAMED_JHON=ANAGRAPHIC.select(NAME='Jhon')
+
+             # all the elements whose surname is Smith
+             SURNAMED_SMITH=ANAGRAPHIC.select(NAME='Smith')
+
+             # all the elements whose code is 101
+             CODED_=ANAGRAPHIC.select(CODE=101)
+             
+             # all the elements whose name is Jhon and Surname is Smith
+             THE_JHON_SMITH=ANAGRAPHIC.select(NAME='Jhon',SURNAME='Smith')
+
+             # all the elements whose name is Jhon and code is 101
+             THE_JHON_SMITH=ANAGRAPHIC.select(NAME='Jhon',CODE=101)
+
+             # all the elements whose name is Jhon and Surname is Smith and Code is 101
+             THE_JHON_SMITH=ANAGRAPHIC.select(NAME='Jhon',SURNAME='Smith',CODE=101)
+      """
       import numpy as np
       flag=np.ones(len(self))
       for k in karg.keys() :
