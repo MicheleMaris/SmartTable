@@ -7,7 +7,7 @@ Needed libraries:
   pyfits
 
 A CSV table is a table where
-
+ 
 data are written just in ASCII
 each row is a record
 fields are separed by "," 
