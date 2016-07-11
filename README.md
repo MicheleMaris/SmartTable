@@ -7,8 +7,23 @@ Needed libraries:
   pyfits
 
 Usage:
-from SmartTable import csv_table()
 
+# read data from a csv table
+from SmartTable import csv_table()
 SM=csv_table('filename.csv')
 
-README TO BE COMPLETED
+#print number of elements
+print len(SM)
+
+#print list of column names
+print SM.keys()
+
+# write data to a pickle file
+SM.pickle('pickle_table.pkl')
+
+# read data from a pickle file
+SM1=csv_table()
+SM1.load('pickle_table.pkl')
+
+************ README TO BE COMPLETED ************
+
