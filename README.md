@@ -1,10 +1,28 @@
-This is a collection of tools to handle tables organized in columns of homogeneous elements.
+This is a collection of tools to handle CSV tables organized in columns of homogeneous elements.
 
 Needed libraries: 
   numpy
   matplotlib
   pickle
   pyfits
+
+A CSV table is a table where
+
+data are written just in ASCII
+each row is a record
+fields are separed by "," 
+the first row defines column names.
+
+Each row begining with # is a comment and it is skipped
+
+As an example
+
+#Example Table
+NAME,SURNAME,CODE
+Jhon,Smith,101
+Harrison,Smith,102
+Liu,Smith,102
+#end table
 
 Usage:
 
