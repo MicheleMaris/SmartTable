@@ -1,7 +1,7 @@
 
 __DESCRIPTION__ = """Base for Table object."""
 
-__VERSION__="3.0 : 2016 Feb 24"
+__VERSION__="3.0 : 2016 Feb 24; 3.1 : 2016 Dec 26"
 
 def DescriptionV2(Dict,names=None,unit_value='',verbose=False) :
    """Try to compile a description from the dictionary
@@ -125,6 +125,7 @@ class base_table :
       self.__tablename__=None if not karg.has_key('tablename') else karg['tablename']
       self.__description__=None if not karg.has_key('description') else karg['description']
       self.__metadata_list__=None if not karg.has_key('newmetadata') else karg['newmetadata']
+      self.__verbose__=False if not karg.has_key('Verbose') else karg['Verbose']
       #self.__columns_description__=None 
       #self.__csvname__=None
       #self.__picklefilename__=None
@@ -145,6 +146,13 @@ class base_table :
          self.__status__='init:completed'
          return
       #
+      # handle the parameter as an hdu
+      if karg.has_key('hdu') :
+         if karg['hdu'] : 
+            self.get_from_hdu(arg[0])
+            self.__status__='init:completed'
+            return
+      #
       # the argument is a not empty string or it is not None
       if arg[0] == None or arg[0].strip()=='' : 
          self.__status__='init:completed'
@@ -156,15 +164,12 @@ class base_table :
             self.load(arg[0].strip())
             self.__status__='init:completed'
             return
-      #
-      # handle the parameter as an hdu
-      if karg.has_key('hdu') :
-         if karg['hdu'] : 
-            self.get_from_hdu(arg[0])
-            self.__status__='init:completed'
-            return
+   def isVerbose(self) :
+      try :
+         return self.__verbose__==True
+      except :
+         return False
    def version(self) :
-      """ returns a string with a version of the library"""
       return __VERSION__
    def _setup_metadata(self) :
       from collections import OrderedDict
@@ -174,9 +179,8 @@ class base_table :
          else :
             self.__dict__[k]=None
    def list_metadata(self,asArray=True) :
-      """ returns a list with names of metadata"""
       import numpy as np
-      l=['__csvname__','__fsep__','__keys__','__picklefilename__','__description__','__info__','__metadata_list__','__columns_description__','__fitsfilename__','__tablename__','__status__']
+      l=['__csvname__','__fsep__','__keys__','__picklefilename__','__description__','__info__','__metadata_list__','__columns_description__','__fitsfilename__','__tablename__','__status__','__verbose__']
       try :
          for k in self.__metadata_list__ :
             l.append(k)
@@ -184,14 +188,12 @@ class base_table :
          pass
       return np.array(l) if asArray else l
    def set_metadata(self,name,value) :
-      """ SET metadata"""
       mname='__%s__'%name
       if (self.list_metadata()==mname).sum() > 0 :
          self.__dict__[mname]=value
       else :
          raise NameError('Metadata %s not found'%name)
    def get_metadata(self,name) :
-      """ GET metadata"""
       mname='__%s__'%name
       if (self.list_metadata==mname).sum() > 0 :
          return self.__dict__[mname]
@@ -205,7 +207,6 @@ class base_table :
      if List == None : self.__keys__=None
      self.__keys__=list(List)
    def keys(self,noMeta=True,justMeta=False,asArray=False,fromColumnsDescription=False,forceInternal=False) : 
-      """ returns list of keys"""
       import numpy as np
       l=self.list_metadata(asArray=False)
       if justMeta : 
@@ -233,14 +234,12 @@ class base_table :
          l1=l1[idx]
          return np.array(l1) if asArray else list(l1)
    def __len__(self) : 
-      """ returns number of rows in the table"""
       import numpy as np
       k=self.keys()
       if len(k)==0 : return 0
       if np.isscalar(self.__dict__[k[0]]) : return 1
       return len(self.__dict__[k[0]])
    def copy(self,justCols=False,justMeta=False) :
-      """ returns a physical copy of the object"""
       import copy
       if justMeta :
          a=base_table()
@@ -264,11 +263,9 @@ class base_table :
       self[name]=value
       self.register_column_description(name,description,unit=unit,shape=shape) 
    def pickle(self,picklefilename) :
-      """ saves a table as a pickle file"""
       import pickle 
       pickle.dump(self.__dict__,open(picklefilename,'w'))
    def load(self,picklefilename) :
-      """ loads a table from a pickle file"""
       import pickle 
       self.__dict__=pickle.load(open(picklefilename,'r'))
       self.__picklefilename__=picklefilename
@@ -363,7 +360,6 @@ class base_table :
       except :
          return ''
    def argslice(self,idx) :
-      """ creates a new table from the current table slicing it at the elements listed in idx"""
       import numpy as np
       import copy
       a=self.copy(justMeta=True)
@@ -380,14 +376,12 @@ class base_table :
       a.__class__=self.__class__
       return a
    def flag(self,*arg,**karg) :
-      """ returns a flag column"""
       import numpy as np
       flag=np.ones(len(self))
       for k in karg.keys() :
          flag*=(self.__dict__[k]==karg[k])
       return flag
    def argselect(self,*arg,**karg) :
-      """ returns list of selected elements (see .select)"""
       import numpy as np
       flag=np.ones(len(self))
       for k in karg.keys() :
@@ -395,30 +389,6 @@ class base_table :
       idx=np.where(flag)[0]
       return idx
    def select(self,*arg,**karg) :
-      """ returns a table made of selected elements 
-          selection is made by assignining values to keywords (names of columns)
-          example: 
-             let be a table ANAGRAPHIC has columns NAME. SURNAME, CODE
-             it is possible to create subtables as following
-          
-             # all the elements whose name is Jhon
-             NAMED_JHON=ANAGRAPHIC.select(NAME='Jhon')
-
-             # all the elements whose surname is Smith
-             SURNAMED_SMITH=ANAGRAPHIC.select(NAME='Smith')
-
-             # all the elements whose code is 101
-             CODED_=ANAGRAPHIC.select(CODE=101)
-             
-             # all the elements whose name is Jhon and Surname is Smith
-             THE_JHON_SMITH=ANAGRAPHIC.select(NAME='Jhon',SURNAME='Smith')
-
-             # all the elements whose name is Jhon and code is 101
-             THE_JHON_SMITH=ANAGRAPHIC.select(NAME='Jhon',CODE=101)
-
-             # all the elements whose name is Jhon and Surname is Smith and Code is 101
-             THE_JHON_SMITH=ANAGRAPHIC.select(NAME='Jhon',SURNAME='Smith',CODE=101)
-      """
       import numpy as np
       flag=np.ones(len(self))
       for k in karg.keys() :
@@ -481,7 +451,8 @@ class base_table :
       for k in range(len(self.keys())) :
          name=self.keys()[k]
          c.append(pyfits.Column(array=self[name],name=dsc['name'][k],format=dsc['format'][k]))
-      T=pyfits.new_table(pyfits.ColDefs(c))
+      #T=pyfits.new_table(pyfits.ColDefs(c))
+      T=pyfits.BinTableHDU.from_columns(pyfits.ColDefs(c))
       try :
          T.header.update('csv',self.__csvname__ if self.__csvname__ != None else '')
       except :
@@ -521,7 +492,8 @@ class base_table :
          try :
             u=hdu.header['TUNIT%d'%it]
          except :
-            print 'TUNIT%d not found, left blanck'%it
+            if self. isVerbose() :
+               print 'TUNIT%d not found, left blanck'%it
             u=''
          f=hdu.header['TFORM%d'%it]
          d=''
@@ -626,7 +598,8 @@ class base_table :
          try :
             that.__dict__[k]=copy.deepcopy(self.__dict__[k])
          except :
-            print "metadata '%s' does not exists, skipped"%k
+            if self.isVerbose() :
+               print "metadata '%s' does not exists, skipped"%k
       that.clean_column_description()
       for k in ll :
          that[k]=copy.deepcopy(self[k])
